@@ -71,14 +71,18 @@ export default function App() {
   useEffect(() => {
     // Under development/production, Socket.IO is attached to the same host/port serving this SPA
     const socketInstance: Socket = io(window.location.origin, {
-      transports: ['websocket', 'polling'],
-      reconnectionAttempts: 10,
+      transports: ['polling', 'websocket'],
       reconnectionDelay: 2000,
+      reconnectionDelayMax: 5000,
     });
 
     socketInstance.on('connect', () => {
-      console.log('Socket.IO connected:', socketInstance.id);
+      console.log('Socket.IO connected successfully with ID:', socketInstance.id);
       setIsConnected(true);
+    });
+
+    socketInstance.on('connect_error', (error) => {
+      console.warn('Socket connection attempt failed:', error.message);
     });
 
     socketInstance.on('disconnect', () => {
