@@ -1,0 +1,6 @@
+{
+  "name": "Multiplayer Blackjack",
+  "description": "A high-fidelity real-time multiplayer Blackjack game with interactive table hosting, custom card zooming, bot integration, rigged dealer mechanics (18 or 19 points), and global leaderboard tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
