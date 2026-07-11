@@ -60,8 +60,10 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
 
+  const playerNameRef = useRef(playerName);
   // Sync player name changes to localStorage
   useEffect(() => {
+    playerNameRef.current = playerName;
     localStorage.setItem('bj_player_name', playerName);
   }, [playerName]);
 
@@ -140,7 +142,7 @@ export default function App() {
     socketInstance.on('round-concluded', (entry: GameHistoryEntry) => {
       // Show summary highlight toast for local player if actually in the table
       if (socketInstance.id && tableIdRef.current) {
-        const localResult = entry.players.find(p => p.name.toLowerCase() === playerName.toLowerCase());
+        const localResult = entry.players.find(p => p.name.toLowerCase() === playerNameRef.current.toLowerCase());
         if (localResult) {
           const change = localResult.chipsChange;
           if (localResult.outcome === 'blackjack') {
@@ -161,7 +163,7 @@ export default function App() {
     return () => {
       socketInstance.disconnect();
     };
-  }, [playerName]);
+  }, []);
 
   const showToast = (text: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToastMessage({ text, type });
@@ -171,33 +173,40 @@ export default function App() {
   };
 
   // Socket action emitters or local game fallbacks
-  const handleHostTable = () => {
+  const handleHostOnline = () => {
     if (!playerName.trim()) return;
 
     if (!socket || !isConnected) {
-      // Boot in local offline mode
-      setIsLocal(true);
-      const localId = 'local-player-1';
-      const lobbyId = `BJ-LOCAL-${Math.floor(100000 + Math.random() * 900000)}`;
-      const newTable = createLocalTable(lobbyId, localId, playerName.trim());
-      setTableId(lobbyId);
-      setTable(newTable);
-      setLogs([`Table ${lobbyId} hosted in OFFLINE mode (Perfect for Vercel & GitHub!)`]);
-      showToast(`Offline table hosted! Enjoy bot chairs and persistent leaderboards.`, 'success');
+      showToast(`Cannot host online: Not connected to multiplayer server. (If hosting on a static platform like Vercel/GitHub Pages, please play Offline Practice Mode as multiplayer requires a Node server!)`, 'error');
       return;
     }
 
+    setIsLocal(false);
     socket.emit('create-table', { playerName: playerName.trim() });
+  };
+
+  const handleHostOffline = () => {
+    if (!playerName.trim()) return;
+
+    setIsLocal(true);
+    const localId = 'local-player-1';
+    const lobbyId = `BJ-LOCAL-${Math.floor(100000 + Math.random() * 900000)}`;
+    const newTable = createLocalTable(lobbyId, localId, playerName.trim());
+    setTableId(lobbyId);
+    setTable(newTable);
+    setLogs([`Table ${lobbyId} hosted in OFFLINE mode (Perfect for solo bot practice!)`]);
+    showToast(`Offline practice table hosted! Enjoy bot chairs and offline gameplay.`, 'success');
   };
 
   const handleJoinTable = (code: string) => {
     if (!playerName.trim() || !code.trim()) return;
 
-    if (!socket || !isConnected) {
-      // Boot in local offline mode
+    const cleanCode = code.toUpperCase().trim();
+
+    // If it's a local code, boot an offline table
+    if (cleanCode.startsWith('BJ-LOCAL')) {
       setIsLocal(true);
       const localId = 'local-player-1';
-      const cleanCode = code.toUpperCase().trim();
       const newTable = createLocalTable(cleanCode, localId, playerName.trim());
       setTableId(cleanCode);
       setTable(newTable);
@@ -206,7 +215,14 @@ export default function App() {
       return;
     }
 
-    socket.emit('join-table', { tableId: code, playerName: playerName.trim() });
+    // Must be connected to the multiplayer server to join an online table
+    if (!socket || !isConnected) {
+      showToast(`Cannot join online table: Not connected to multiplayer server. (Please play Offline Practice Mode as multiplayer requires a live connection!)`, 'error');
+      return;
+    }
+
+    setIsLocal(false);
+    socket.emit('join-table', { tableId: cleanCode, playerName: playerName.trim() });
   };
 
   const handlePlaceBet = (amount: number) => {
@@ -492,9 +508,11 @@ export default function App() {
               <TableLobby
                 playerName={playerName}
                 setPlayerName={setPlayerName}
-                onHost={handleHostTable}
+                onHostOnline={handleHostOnline}
+                onHostOffline={handleHostOffline}
                 onJoin={handleJoinTable}
                 joinError={joinError}
+                isConnected={isConnected}
               />
             </div>
             
